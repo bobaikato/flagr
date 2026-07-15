@@ -1,0 +1,152 @@
+#                 █████
+#                ░░███
+#        ██████  ███████    ██████
+#       ███░░███░░░███░    ░░░░░███
+#      ░███ ░███  ░███      ███████
+#      ░███ ░███  ░███ ███ ███░░███
+#      ░░██████   ░░█████ ░░████████
+#       ░░░░░░     ░░░░░   ░░░░░░░░
+#
+#    Copyright (C) 2026 — 2026, Ota. All Rights Reserved.
+#
+#    DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+#
+#    Licensed under the Apache License, Version 2.0. See LICENSE for the full license text.
+#    You may not use this file except in compliance with that License.
+#    Unless required by applicable law or agreed to in writing, software distributed under the
+#    License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+#    either express or implied. See the License for the specific language governing permissions
+#    and limitations under the License.
+#
+#    If you need additional information or have any questions, please email: os@ota.run
+
+name: Ota governance
+
+on:
+  push:
+    branches:
+      - bobai/flagr-ota-pressure
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  OTA_NO_UPDATE_CHECK: "1"
+
+jobs:
+  native-verification:
+    name: Ota native verification (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+
+      - uses: ota-run/setup@v1.0.8
+        with:
+          source: contract
+
+      - name: Validate contract
+        run: ota validate .
+
+      - name: Diagnose native verification readiness
+        run: ota doctor --workflow verify --json . > ota-doctor.json
+
+      - name: Discover task and safe-task surfaces
+        run: |
+          ota tasks --use .
+          ota tasks --safe --use .
+
+      - name: Dry-run native task and workflow surfaces
+        run: |
+          ota run test --dry-run --json .
+          ota run verify --dry-run --json .
+          ota up --workflow verify --dry-run --json .
+
+      - name: Execute deterministic native verification
+        run: ota up --workflow verify --stream .
+
+      - name: Prove native runtime on Ubuntu and macOS
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: ota proof runtime --workflow local --json . > ota-native-runtime-proof.json
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota-native-diagnostics-${{ matrix.os }}
+          path: |
+            ota-doctor.json
+            ota-native-runtime-proof.json
+
+  container-and-integration:
+    name: Ota container and integration verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+
+      - uses: ota-run/setup@v1.0.8
+        with:
+          source: contract
+
+      - name: Validate contract
+        run: ota validate .
+
+      - name: Diagnose container and integration readiness
+        run: |
+          ota doctor --container --json . > ota-container-doctor.json
+          ota doctor --workflow integration --json . > ota-integration-doctor.json
+
+      - name: Discover task and safe-task surfaces
+        run: |
+          ota tasks --use .
+          ota tasks --safe --use .
+
+      - name: Dry-run container and integration surfaces
+        run: |
+          ota run dev --container --dry-run --json .
+          ota up --workflow integration --dry-run --json .
+          ota run verify:integration --dry-run --json .
+
+      - name: Prove container runtime
+        run: ota proof runtime --workflow local --container --json . > ota-container-runtime-proof.json
+
+      - name: Start the documented integration topology
+        run: ota up --workflow integration --stream .
+
+      - name: Execute integration suite and benchmark
+        run: ota run verify:integration --stream .
+
+      - name: Archive integration receipt
+        run: ota receipt --workflow integration --archive --json . > ota-integration-receipt.json
+
+      - name: Tear down integration topology
+        if: always()
+        run: ota run integration:down --stream .
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota-container-and-integration-diagnostics
+          path: |
+            ota-container-doctor.json
+            ota-integration-doctor.json
+            ota-container-runtime-proof.json
+            ota-integration-receipt.json
