@@ -37,3 +37,9 @@ coverage.txt
 progress.md
 integration-bench.txt
 
+
+# Ota local runtime artifacts
+.ota/state/*
+.ota/contracts/*
+.ota/receipts/*
+.ota/proof/*

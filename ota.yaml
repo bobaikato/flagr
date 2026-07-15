@@ -1,0 +1,233 @@
+version: 1
+project:
+  name: flagr
+  description: Go feature-flag service with a SQLite-backed local server and Docker Compose integration topology
+  type: service
+
+execution:
+  default_context: host
+  contexts:
+    host:
+      backend: native
+    app:
+      backend: container
+      lifecycle: persistent
+      container:
+        image: golang:1.26-bookworm
+
+toolchains:
+  go:
+    version: ">=1.26,<1.27"
+    fulfillment:
+      source: go
+      mode: none
+
+surfaces:
+  api:
+    kind: http
+    label: Flagr API
+    purpose: Local SQLite-backed Flagr API
+    visibility: internal
+    port: 18000
+    path: /api/v1/health
+    readiness:
+      kind: http
+      path: /api/v1/health
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+tasks:
+  setup:
+    description: Hydrate the Go module graph required by the selected execution mode
+    category: setup
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          prepare:
+            kind: dependency_hydration
+            medium: package_dependencies
+            source:
+              kind: go_modules
+              cwd: .
+        container:
+          context: app
+          prepare:
+            kind: dependency_hydration
+            medium: package_dependencies
+            source:
+              kind: go_modules
+              cwd: .
+    effects:
+      network: true
+      network_kind: dependency_hydration
+    requirements:
+      toolchains:
+        - go
+    safe_for_agent: true
+
+  build:
+    description: Build the Flagr server binary from the generated API and Go source
+    category: build
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          env:
+            CGO_ENABLED: "0"
+          command:
+            exe: go
+            args:
+              - build
+              - -o
+              - flagr
+              - github.com/openflagr/flagr/cmd/flagr-server
+        container:
+          context: app
+          env:
+            CGO_ENABLED: "0"
+          command:
+            exe: go
+            args:
+              - build
+              - -o
+              - flagr
+              - github.com/openflagr/flagr/cmd/flagr-server
+    depends_on:
+      - setup
+    effects:
+      writes:
+        - flagr
+    requirements:
+      toolchains:
+        - go
+    safe_for_agent: true
+
+  dev:
+    description: Start the local SQLite-backed Flagr API and wait for its health endpoint
+    category: dev
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          launch:
+            kind: command
+            exe: ./flagr
+            args:
+              - --host
+              - 127.0.0.1
+              - --port
+              - "18000"
+          runtime:
+            kind: service
+            surfaces:
+              - api
+        container:
+          context: app
+          launch:
+            kind: command
+            exe: ./flagr
+            args:
+              - --host
+              - 0.0.0.0
+              - --port
+              - "18000"
+          runtime:
+            kind: service
+            surfaces:
+              api:
+                bind:
+                  address: 0.0.0.0
+                  port:
+                    mode: fixed
+                    value: 18000
+                project:
+                  host:
+                    address: 127.0.0.1
+                    port:
+                      mode: fixed
+                      value: 18000
+                    path: /api/v1/health
+                    primary: true
+    depends_on:
+      - build
+    requirements:
+      toolchains:
+        - go
+
+  test:
+    description: Run the deterministic Go package test lane
+    category: test
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          command:
+            exe: go
+            args:
+              - test
+              - ./pkg/...
+        container:
+          context: app
+          command:
+            exe: go
+            args:
+              - test
+              - ./pkg/...
+    depends_on:
+      - setup
+    requirements:
+      toolchains:
+        - go
+    safe_for_agent: true
+
+  verify:
+    description: Run the contract-owned deterministic verification lane
+    category: test
+    aggregate:
+      tasks:
+        - test
+    safe_for_agent: true
+
+workflows:
+  default: local
+  local:
+    intent: local_development
+    description: Build and run the local SQLite-backed API
+    run:
+      task: dev
+  verify:
+    intent: verification
+    description: Run deterministic Go package verification
+    run:
+      task: verify
+
+agent:
+  posture: readiness_strict
+  entrypoint: setup
+  default_task: verify
+  safe_tasks:
+    - setup
+    - build
+    - test
+    - verify
+  writable_paths:
+    - flagr
+  protected_paths:
+    - swagger_gen
+  verify_after_changes:
+    - verify
+  bootstrap:
+    ota:
+      source:
+        kind: branch
+        branch: 1.6.24-implementation
+
+metadata:
+  ota:
+    minimum_version: "1.6.24"
