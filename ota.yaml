@@ -106,6 +106,27 @@ tasks:
         - go
     safe_for_agent: true
 
+  integration:image:
+    description: Build the locally tagged image consumed by the six-node Compose integration topology
+    category: build
+    action:
+      kind: build_container_image
+      file: integration_tests/Dockerfile-Integration-Test
+      context: .
+      tag: flagr_integration_tests
+    requirements:
+      tools:
+        docker: "*"
+    effects:
+      network: true
+      network_kind: broad
+      external_state:
+        - docker
+    notes: |
+      This is the typed replacement for integration_tests/Makefile build-image. It intentionally
+      remains outside agent-safe execution because the Docker build can acquire base and build-stage
+      dependencies over the network.
+
   dev:
     description: Start the local SQLite-backed Flagr API and wait for its health endpoint
     category: dev
