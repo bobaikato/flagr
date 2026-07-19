@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
-          go-version: '>=1.26,<1.27'
+          go-version: '1.26'
       - uses: ota-run/setup@493cba84bf7f7c11c9e8e996d832d93a89c62184
         with:
           source: contract
@@ -89,7 +89,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
-          go-version: '>=1.26,<1.27'
+          go-version: '1.26'
       - uses: ota-run/setup@493cba84bf7f7c11c9e8e996d832d93a89c62184
         with:
           source: contract
