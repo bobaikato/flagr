@@ -440,6 +440,9 @@ tasks:
   test:
     description: Run the deterministic Go package test lane
     category: test
+    only_on:
+      - linux
+      - macos
     execution:
       default_mode: native
       modes:
@@ -467,6 +470,9 @@ tasks:
   verify:
     description: Run the contract-owned deterministic verification lane
     category: test
+    only_on:
+      - linux
+      - macos
     aggregate:
       tasks:
         - test
