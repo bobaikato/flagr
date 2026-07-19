@@ -578,8 +578,29 @@ func TestIntegration_EvalCacheExportQuery(t *testing.T) {
 	postJSON(t, fmt.Sprintf("/api/v1/flags/%d/tags", enabledFlag.ID), map[string]any{"value": tagVal2}, nil)
 	postJSON(t, fmt.Sprintf("/api/v1/flags/%d/tags", disabledFlag.ID), map[string]any{"value": tagVal2}, nil)
 
-	// Wait for eval cache refresh
-	time.Sleep(2 * time.Second)
+	// The cache refresh cadence differs across Compose database backends. Wait for
+	// the specific mutations this test made instead of assuming a fixed delay.
+	if err := pollUntil("eval cache query fixture", "/api/v1/export/eval_cache/json", evalCacheReadyTimeout, func() bool {
+		var cache struct{ Flags []flagResponse }
+		resp, err := doReq("GET", fmt.Sprintf("/api/v1/export/eval_cache/json?ids=%d,%d", enabledFlag.ID, disabledFlag.ID), nil)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&cache) != nil || len(cache.Flags) != 2 {
+			return false
+		}
+
+		var tagged struct{ Flags []flagResponse }
+		resp, err = doReq("GET", fmt.Sprintf("/api/v1/export/eval_cache/json?tags=%s", tagVal1), nil)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		return resp.StatusCode == http.StatusOK && json.NewDecoder(resp.Body).Decode(&tagged) == nil && len(tagged.Flags) == 1 && tagged.Flags[0].ID == enabledFlag.ID
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("no params returns all flags", func(t *testing.T) {
 		var cache struct{ Flags []flagResponse }
