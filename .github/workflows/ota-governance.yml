@@ -36,28 +36,28 @@ jobs:
   verify-native-linux:
     uses: ./.github/workflows/ota-verify-native-linux.yml
     with:
-      ota_projection_identity: sha256:51da4f200efdcda0304c860ee9975e5243dc24b433e8e702313d329bf9a4262c
+      ota_projection_identity: sha256:8b66dd083f67b914d3233c7fb585323d71124e0deb8eb925a7b2f0d51854be19
       ota_target_os: linux
       ota_runner: ubuntu-latest
 
   verify-native-macos:
     uses: ./.github/workflows/ota-verify-native-macos.yml
     with:
-      ota_projection_identity: sha256:c4c1582107709662980bbd8b55727230fe18b93888c0784fa7e621a44ed5fe3f
+      ota_projection_identity: sha256:95497a6d568178d8461fe7540320105c8db17bd448cf949682abd09954c64f83
       ota_target_os: macos
       ota_runner: macos-latest
 
   verify-native-windows:
     uses: ./.github/workflows/ota-verify-native-windows.yml
     with:
-      ota_projection_identity: sha256:df0b05d6a72b68cc4af80272606468f7dba2ed28b92e1490dcd759e33c6efcd0
+      ota_projection_identity: sha256:297f0877499c6a4407358bc5f4fb9b29373e386bc7ba8c6226ea4dace77ebc9a
       ota_target_os: windows
       ota_runner: windows-latest
 
   verify-container-linux:
     uses: ./.github/workflows/ota-verify-container-linux.yml
     with:
-      ota_projection_identity: sha256:e2a6bb89293ccc7268d3fa36e442447ff97a44f873a5d33b88d1168fc7fde307
+      ota_projection_identity: sha256:3db28646e00f61abe23e750bfebe26f8ed880d482a0feffdb1a00288652d2a22
       ota_target_os: linux
       ota_runner: ubuntu-latest
 
