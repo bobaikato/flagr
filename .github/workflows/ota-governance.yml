@@ -11,8 +11,8 @@
 #
 #    DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
-#    Licensed under the Apache License, Version 2.0. See LICENSE for the full license text.
-#    You may not use this file except in compliance with that License.
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
 #    Unless required by applicable law or agreed to in writing, software distributed under the
 #    License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 #    either express or implied. See the License for the specific language governing permissions
@@ -32,123 +32,108 @@ on:
 permissions:
   contents: read
 
-env:
-  OTA_NO_UPDATE_CHECK: "1"
-
 jobs:
-  native-verification:
-    name: Ota native verification (${{ matrix.os }})
+  verify-native-linux:
+    uses: ./.github/workflows/ota-verify-native-linux.yml
+    with:
+      ota_projection_identity: sha256:51da4f200efdcda0304c860ee9975e5243dc24b433e8e702313d329bf9a4262c
+      ota_target_os: linux
+      ota_runner: ubuntu-latest
+
+  verify-native-macos:
+    uses: ./.github/workflows/ota-verify-native-macos.yml
+    with:
+      ota_projection_identity: sha256:c4c1582107709662980bbd8b55727230fe18b93888c0784fa7e621a44ed5fe3f
+      ota_target_os: macos
+      ota_runner: macos-latest
+
+  verify-native-windows:
+    uses: ./.github/workflows/ota-verify-native-windows.yml
+    with:
+      ota_projection_identity: sha256:df0b05d6a72b68cc4af80272606468f7dba2ed28b92e1490dcd759e33c6efcd0
+      ota_target_os: windows
+      ota_runner: windows-latest
+
+  verify-container-linux:
+    uses: ./.github/workflows/ota-verify-container-linux.yml
+    with:
+      ota_projection_identity: sha256:e2a6bb89293ccc7268d3fa36e442447ff97a44f873a5d33b88d1168fc7fde307
+      ota_target_os: linux
+      ota_runner: ubuntu-latest
+
+  # These runtime and Compose integration lanes are intentionally outside agent admission.
+  # They remain human-owned CI proof instead of becoming a generated agent-execution projection.
+  runtime-native:
+    name: ${{ matrix.os }} bounded runtime proof
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
+        os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
-          go-version: "1.26"
-
-      # Pressure-test the unreleased contract-source installation fix with Ota's branch contract.
-      - uses: ota-run/setup@d3608b5b25e7857de50501204a854dc3f9ac4f2c
+          go-version: '>=1.26,<1.27'
+      - uses: ota-run/setup@493cba84bf7f7c11c9e8e996d832d93a89c62184
         with:
           source: contract
+      - name: Prove bounded native runtime
+        run: ota proof runtime --workflow local --mode native --archive --json
 
-      - name: Validate contract
-        run: ota validate .
-
-      - name: Diagnose native verification readiness
-        run: ota doctor --workflow verify --json . > ota-doctor.json
-
-      - name: Discover task and safe-task surfaces
-        run: |
-          ota tasks --use .
-          ota tasks --safe --use .
-
-      - name: Dry-run native task and workflow surfaces
-        run: |
-          ota run test --dry-run --json .
-          ota run verify --dry-run --json .
-          ota up --workflow verify --dry-run --json .
-
-      - name: Execute deterministic native verification
-        run: ota up --workflow verify --stream .
-
-      - name: Prove native runtime on Ubuntu and macOS
-        if: ${{ matrix.os != 'windows-latest' }}
-        run: ota proof runtime --workflow local --json . > ota-native-runtime-proof.json
-
-      - name: Upload diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ota-native-diagnostics-${{ matrix.os }}
-          path: |
-            ota-doctor.json
-            ota-native-runtime-proof.json
-
-  container-and-integration:
-    name: Ota container and integration verification
+  runtime-container-and-integration:
+    name: Ubuntu container runtime and integration proof
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
-          go-version: "1.26"
-
-      # Pressure-test the unreleased contract-source installation fix with Ota's branch contract.
-      - uses: ota-run/setup@d3608b5b25e7857de50501204a854dc3f9ac4f2c
+          go-version: '>=1.26,<1.27'
+      - uses: ota-run/setup@493cba84bf7f7c11c9e8e996d832d93a89c62184
         with:
           source: contract
-
-      - name: Validate contract
-        run: ota validate .
-
       - name: Diagnose container and integration readiness
         run: |
           ota doctor --container --json . > ota-container-doctor.json
           ota doctor --workflow integration --json . > ota-integration-doctor.json
-
-      - name: Discover task and safe-task surfaces
-        run: |
-          ota tasks --use .
-          ota tasks --safe --use .
-
-      - name: Dry-run container and integration surfaces
+      - name: Preview container and integration surfaces
         run: |
           ota run dev --container --dry-run --json .
           ota up --workflow integration --dry-run --json .
           ota run verify:integration --dry-run --json .
-
-      - name: Prove container runtime
-        run: ota proof runtime --workflow local --container --json . > ota-container-runtime-proof.json
-
+      - name: Prove bounded container runtime
+        run: ota proof runtime --workflow local --mode container --archive --json
       - name: Start the documented integration topology
         run: ota up --workflow integration --stream .
-
       - name: Execute integration suite and benchmark
         run: ota run verify:integration --stream .
-
       - name: Archive integration receipt
         run: ota receipt --workflow integration --archive --json . > ota-integration-receipt.json
-
       - name: Tear down integration topology
         if: always()
         run: ota run integration:down --stream .
-
       - name: Upload diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ota-container-and-integration-diagnostics
           path: |
             ota-container-doctor.json
             ota-integration-doctor.json
-            ota-container-runtime-proof.json
             ota-integration-receipt.json
+
+  contract-ci-drift:
+    name: Contract-to-CI drift gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Fail on contract-to-CI workflow drift
+        uses: ota-run/action@4fba25c6c0063af009d38e215d97ab1a925277c8
+        with:
+          command: doctor
+          source: contract
+          contract-path: ota.yaml
+          fail-on-ci-drift: true
+          comment-pr: false
+          artifact-name: ota-contract-ci-drift

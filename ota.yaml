@@ -519,7 +519,10 @@ agent:
     ota:
       source:
         kind: branch
-        branch: 1.6.24-implementation
+        branch: 1.6.25-implementation
+  refusal_canaries:
+    - task: integration:image
+    - workflow: integration
 
 metadata:
   ota:
