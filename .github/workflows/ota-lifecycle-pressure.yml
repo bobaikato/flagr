@@ -50,6 +50,28 @@ jobs:
         run: ota tasks --use --json . > ota-lifecycle-tasks.json
       - name: Prove managed lifecycle transaction
         run: ota proof lifecycle --workflow integration:lifecycle --archive --json . > ota-lifecycle-proof.json
+      - name: Prove lifecycle assertion-failure finalization
+        shell: bash
+        run: |
+          set +e
+          ota proof lifecycle --workflow integration:lifecycle:failure-control --archive --json . > ota-lifecycle-failure-control.json
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "expected lifecycle failure control to fail"
+            exit 1
+          fi
+          jq -e '
+            (.archive.identity | startswith("sha256:")) and
+            .proof.ok == false and
+            .proof.proof_verdict == "failed" and
+            .proof.assertion.task == "integration:test:unreachable-control" and
+            .proof.assertion.state == "failed" and
+            (.proof.assertion.exit_code | type) == "number" and
+            .proof.finalization.state == "completed" and
+            ([.proof.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | length > 0) and
+            ([.proof.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | all(. == "state_observed"))
+          ' ota-lifecycle-failure-control.json
       - name: Upload lifecycle evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -59,3 +81,4 @@ jobs:
             ota-lifecycle-doctor.json
             ota-lifecycle-tasks.json
             ota-lifecycle-proof.json
+            ota-lifecycle-failure-control.json

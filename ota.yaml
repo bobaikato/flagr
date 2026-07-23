@@ -396,6 +396,42 @@ tasks:
         - mysql
         - postgres
 
+  integration:test:unreachable-control:
+    description: >-
+      Intentionally route the real integration assertion to an unavailable endpoint to pressure
+      lifecycle failure diagnostics and teardown; this is a control, not a Flagr verification lane.
+    category: test
+    command:
+      exe: go
+      args:
+        - test
+        - -tags=integration
+        - -v
+        - -count=1
+        - .
+      cwd: integration_tests
+    env:
+      FLAGR_SERVER_URLS: 127.0.0.1:9
+    requires_services:
+      - integration-sqlite
+      - integration-mysql
+      - integration-mysql8
+      - integration-postgres9
+      - integration-postgres13
+      - integration-legacy
+    requirements:
+      toolchains:
+        - go
+      tools:
+        docker: "*"
+    effects:
+      network: true
+      network_kind: integration_test
+      external_state:
+        - docker
+        - mysql
+        - postgres
+
   integration:lifecycle:prepare:
     description: Build the integration image and provision its external Docker network before lifecycle ownership
     category: setup
@@ -579,6 +615,24 @@ workflows:
           - integration-legacy
         assertion:
           task: integration:test
+  integration:lifecycle:failure-control:
+    intent: verification
+    description: >-
+      Intentionally fail the real integration assertion after managed services are ready to prove
+      Ota retains bounded diagnostics and finalizes the transaction.
+    run:
+      task: integration:lifecycle:prepare
+    proof:
+      lifecycle:
+        services:
+          - integration-sqlite
+          - integration-mysql
+          - integration-mysql8
+          - integration-postgres9
+          - integration-postgres13
+          - integration-legacy
+        assertion:
+          task: integration:test:unreachable-control
 
 agent:
   posture: readiness_strict
