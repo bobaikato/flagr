@@ -1,4 +1,4 @@
-# ota:managed-github-projection v1 identity=sha256:899e669562eacd7c8215d1ac0823a7f53254266275e4d90b22d2d06e892be6d1
+# ota:managed-github-projection v1 identity=sha256:66843d5f0d703a7fab5202061b175455082f81d310d7133e8e43cc4349719ed9
 name: Ota governance ('verify')
 
 on:
@@ -37,8 +37,6 @@ jobs:
         run: ota tasks --safe --use --json
       - name: Preview contract lane
         run: ota up --workflow 'verify' --mode container --agent --dry-run --json
-      - name: Prepare contract lane
-        run: ota up --workflow 'verify' --mode container --agent --json
       - name: Execute finite contract task
         run: ota run 'verify' --mode container --agent
       - name: Archive workflow readiness receipt

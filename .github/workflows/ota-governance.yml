@@ -26,6 +26,7 @@ on:
   push:
     branches:
       - bobai/flagr-ota-pressure
+      - bobai/flagr-v11.18-lifecycle-pressure
   pull_request:
   workflow_dispatch:
 
@@ -36,21 +37,21 @@ jobs:
   verify-native-linux:
     uses: ./.github/workflows/ota-verify-native-linux.yml
     with:
-      ota_projection_identity: sha256:c52ace7d7784d4809a1a8db537fed679997f9430c1c1d4b877598128e30e1ea1
+      ota_projection_identity: sha256:75488d7f3f025ae7586f277ec32f99ae6774b19dcefbdc25e6a09ab3a962eca4
       ota_target_os: linux
       ota_runner: ubuntu-latest
 
   verify-native-macos:
     uses: ./.github/workflows/ota-verify-native-macos.yml
     with:
-      ota_projection_identity: sha256:3c01afb6d79cf30eda7951d158027f607c3fc66bd7ddb13ed8f798fd0bf46584
+      ota_projection_identity: sha256:aaccedcfe2a1b1195130dfff350b8ac95b3b9ec518d678edd439a98bf285d58a
       ota_target_os: macos
       ota_runner: macos-latest
 
   verify-container-linux:
     uses: ./.github/workflows/ota-verify-container-linux.yml
     with:
-      ota_projection_identity: sha256:899e669562eacd7c8215d1ac0823a7f53254266275e4d90b22d2d06e892be6d1
+      ota_projection_identity: sha256:66843d5f0d703a7fab5202061b175455082f81d310d7133e8e43cc4349719ed9
       ota_target_os: linux
       ota_runner: ubuntu-latest
 

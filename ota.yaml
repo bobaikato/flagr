@@ -58,6 +58,8 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-mysql:
     manager:
       kind: compose
@@ -78,6 +80,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-mysql-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-mysql8:
     manager:
       kind: compose
@@ -98,6 +104,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-mysql8-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-postgres9:
     manager:
       kind: compose
@@ -118,6 +128,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-postgres9-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-postgres13:
     manager:
       kind: compose
@@ -138,6 +152,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-postgres13-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-legacy:
     manager:
       kind: compose
@@ -158,6 +176,40 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-mysql-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: mysql
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-mysql8-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: mysql8
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-postgres9-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: postgres9
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-postgres13-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: postgres13
+    lifecycle:
+      teardown_assertion: manager_inactive
 
 tasks:
   setup:
@@ -324,8 +376,6 @@ tasks:
       cwd: integration_tests
     env:
       FLAGR_SERVER_URLS: localhost:18001,localhost:18002,localhost:18003,localhost:18004,localhost:18005,localhost:18006
-    depends_on:
-      - integration:up
     requires_services:
       - integration-sqlite
       - integration-mysql
@@ -345,6 +395,14 @@ tasks:
         - docker
         - mysql
         - postgres
+
+  integration:lifecycle:prepare:
+    description: Build the integration image and provision its external Docker network before lifecycle ownership
+    category: setup
+    aggregate:
+      tasks:
+        - integration:network
+        - integration:image
 
   integration:benchmark:
     description: Run the documented Go integration benchmark pass across all six Compose-backed Flagr instances
@@ -505,6 +563,22 @@ workflows:
       task: integration:up
     run:
       task: verify:integration
+  integration:lifecycle:
+    intent: verification
+    description: Prove the six-instance Compose lifecycle with runner-owned teardown
+    run:
+      task: integration:lifecycle:prepare
+    proof:
+      lifecycle:
+        services:
+          - integration-sqlite
+          - integration-mysql
+          - integration-mysql8
+          - integration-postgres9
+          - integration-postgres13
+          - integration-legacy
+        assertion:
+          task: integration:test
 
 agent:
   posture: readiness_strict
@@ -524,8 +598,8 @@ agent:
   bootstrap:
     ota:
       source:
-        kind: branch
-        branch: 1.6.25-implementation
+        kind: git_rev
+        rev: 445cd45ccf77c08abd46c886e9f0a8028c0d75d6
   refusal_canaries:
     - task: integration:image
     - workflow: integration
