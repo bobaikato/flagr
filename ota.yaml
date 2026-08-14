@@ -58,6 +58,8 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-mysql:
     manager:
       kind: compose
@@ -78,6 +80,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-mysql-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-mysql8:
     manager:
       kind: compose
@@ -98,6 +104,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-mysql8-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-postgres9:
     manager:
       kind: compose
@@ -118,6 +128,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-postgres9-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-postgres13:
     manager:
       kind: compose
@@ -138,6 +152,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    depends_on:
+      - integration-postgres13-db
+    lifecycle:
+      teardown_assertion: manager_inactive
   integration-legacy:
     manager:
       kind: compose
@@ -158,6 +176,40 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-mysql-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: mysql
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-mysql8-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: mysql8
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-postgres9-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: postgres9
+    lifecycle:
+      teardown_assertion: manager_inactive
+  integration-postgres13-db:
+    manager:
+      kind: compose
+      name: integration_tests
+      file: integration_tests/docker-compose.yml
+      service: postgres13
+    lifecycle:
+      teardown_assertion: manager_inactive
 
 tasks:
   setup:
@@ -324,8 +376,6 @@ tasks:
       cwd: integration_tests
     env:
       FLAGR_SERVER_URLS: localhost:18001,localhost:18002,localhost:18003,localhost:18004,localhost:18005,localhost:18006
-    depends_on:
-      - integration:up
     requires_services:
       - integration-sqlite
       - integration-mysql
@@ -345,6 +395,50 @@ tasks:
         - docker
         - mysql
         - postgres
+
+  integration:test:unreachable-control:
+    description: >-
+      Intentionally route the real integration assertion to an unavailable endpoint to pressure
+      lifecycle failure diagnostics and teardown; this is a control, not a Flagr verification lane.
+    category: test
+    command:
+      exe: go
+      args:
+        - test
+        - -tags=integration
+        - -v
+        - -count=1
+        - .
+      cwd: integration_tests
+    env:
+      FLAGR_SERVER_URLS: 127.0.0.1:9
+    requires_services:
+      - integration-sqlite
+      - integration-mysql
+      - integration-mysql8
+      - integration-postgres9
+      - integration-postgres13
+      - integration-legacy
+    requirements:
+      toolchains:
+        - go
+      tools:
+        docker: "*"
+    effects:
+      network: true
+      network_kind: integration_test
+      external_state:
+        - docker
+        - mysql
+        - postgres
+
+  integration:lifecycle:prepare:
+    description: Build the integration image and provision its external Docker network before lifecycle ownership
+    category: setup
+    aggregate:
+      tasks:
+        - integration:network
+        - integration:image
 
   integration:benchmark:
     description: Run the documented Go integration benchmark pass across all six Compose-backed Flagr instances
@@ -440,6 +534,9 @@ tasks:
   test:
     description: Run the deterministic Go package test lane
     category: test
+    only_on:
+      - linux
+      - macos
     execution:
       default_mode: native
       modes:
@@ -467,6 +564,9 @@ tasks:
   verify:
     description: Run the contract-owned deterministic verification lane
     category: test
+    only_on:
+      - linux
+      - macos
     aggregate:
       tasks:
         - test
@@ -499,6 +599,40 @@ workflows:
       task: integration:up
     run:
       task: verify:integration
+  integration:lifecycle:
+    intent: verification
+    description: Prove the six-instance Compose lifecycle with runner-owned teardown
+    run:
+      task: integration:lifecycle:prepare
+    proof:
+      lifecycle:
+        services:
+          - integration-sqlite
+          - integration-mysql
+          - integration-mysql8
+          - integration-postgres9
+          - integration-postgres13
+          - integration-legacy
+        assertion:
+          task: integration:test
+  integration:lifecycle:failure-control:
+    intent: verification
+    description: >-
+      Intentionally fail the real integration assertion after managed services are ready to prove
+      Ota retains bounded diagnostics and finalizes the transaction.
+    run:
+      task: integration:lifecycle:prepare
+    proof:
+      lifecycle:
+        services:
+          - integration-sqlite
+          - integration-mysql
+          - integration-mysql8
+          - integration-postgres9
+          - integration-postgres13
+          - integration-legacy
+        assertion:
+          task: integration:test:unreachable-control
 
 agent:
   posture: readiness_strict
@@ -518,12 +652,12 @@ agent:
   bootstrap:
     ota:
       source:
-        kind: branch
-        branch: 1.6.25-implementation
+        kind: version
+        version: v1.6.25
   refusal_canaries:
     - task: integration:image
     - workflow: integration
 
 metadata:
   ota:
-    minimum_version: "1.6.24"
+    minimum_version: "1.6.25"

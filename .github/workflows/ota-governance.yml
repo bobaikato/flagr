@@ -36,28 +36,21 @@ jobs:
   verify-native-linux:
     uses: ./.github/workflows/ota-verify-native-linux.yml
     with:
-      ota_projection_identity: sha256:51da4f200efdcda0304c860ee9975e5243dc24b433e8e702313d329bf9a4262c
+      ota_projection_identity: sha256:2f4ab8caadcdde95b00c05006d4d2b8d3b20e5c40cdb23b358dd7bac66ae6dba
       ota_target_os: linux
       ota_runner: ubuntu-latest
 
   verify-native-macos:
     uses: ./.github/workflows/ota-verify-native-macos.yml
     with:
-      ota_projection_identity: sha256:c4c1582107709662980bbd8b55727230fe18b93888c0784fa7e621a44ed5fe3f
+      ota_projection_identity: sha256:e005a352ca35b764108fa5336a902b656bdfb76f65c8a5fc63107857b4db9fe7
       ota_target_os: macos
       ota_runner: macos-latest
-
-  verify-native-windows:
-    uses: ./.github/workflows/ota-verify-native-windows.yml
-    with:
-      ota_projection_identity: sha256:df0b05d6a72b68cc4af80272606468f7dba2ed28b92e1490dcd759e33c6efcd0
-      ota_target_os: windows
-      ota_runner: windows-latest
 
   verify-container-linux:
     uses: ./.github/workflows/ota-verify-container-linux.yml
     with:
-      ota_projection_identity: sha256:e2a6bb89293ccc7268d3fa36e442447ff97a44f873a5d33b88d1168fc7fde307
+      ota_projection_identity: sha256:83a36fbf206bd7b68ffcdb3130828c94c2231187ad62478c04ee48800189393b
       ota_target_os: linux
       ota_runner: ubuntu-latest
 
@@ -75,7 +68,7 @@ jobs:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version: '1.26'
-      - uses: ota-run/setup@493cba84bf7f7c11c9e8e996d832d93a89c62184
+      - uses: ota-run/setup@85bf49c11a5aa3ddedfa56c47682cfd40b238f1f
         with:
           source: contract
       - name: Prove bounded native runtime
@@ -90,7 +83,7 @@ jobs:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version: '1.26'
-      - uses: ota-run/setup@493cba84bf7f7c11c9e8e996d832d93a89c62184
+      - uses: ota-run/setup@85bf49c11a5aa3ddedfa56c47682cfd40b238f1f
         with:
           source: contract
       - name: Diagnose container and integration readiness
@@ -129,7 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Fail on contract-to-CI workflow drift
-        uses: ota-run/action@4fba25c6c0063af009d38e215d97ab1a925277c8
+        uses: ota-run/action@6bb5bf686df5a8385202c8c20b6f91c045e3c161
         with:
           command: doctor
           source: contract

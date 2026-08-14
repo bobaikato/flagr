@@ -1,4 +1,4 @@
-# ota:managed-github-projection v1 identity=sha256:51da4f200efdcda0304c860ee9975e5243dc24b433e8e702313d329bf9a4262c
+# ota:managed-github-projection v1 identity=sha256:2f4ab8caadcdde95b00c05006d4d2b8d3b20e5c40cdb23b358dd7bac66ae6dba
 name: Ota governance ('verify')
 
 on:
@@ -40,9 +40,9 @@ jobs:
         run: ota tasks --safe --use --json
       - name: Preview contract lane
         run: ota up --workflow 'verify' --mode native --agent --dry-run --json
-      - name: Run contract lane
-        run: ota up --workflow 'verify' --mode native --agent --json
-      - name: Archive contract receipt
+      - name: Execute finite contract task
+        run: ota run 'verify' --mode native --agent
+      - name: Archive workflow readiness receipt
         run: ota receipt --workflow 'verify' --mode native --archive --json
   ota_ota_refusal_canary_task_integration_image:
     name: 'ota.refusal-canary.task.integration-image (linux/native)'
